@@ -17,6 +17,7 @@ import type { XpSourceType } from '../../db/models/index.js';
 import { updateMissionProgress } from '../missions/missionProgress.service.js';
 import { cacheManager } from '../../shared/cache/cacheManager.js';
 import { unifiedRuntimeStateService } from '../runtime-state/unifiedRuntimeState.service.js';
+import { decideFocusXp } from '../activity/focusXpDecision.js';
 
 export interface XpEventPayload {
   userId: string;
@@ -257,7 +258,19 @@ function calculateXpAward(
       }
       return XP_REWARDS.syncCompleted;
     }
-    case 'focus_session': return 50; // Pomodoro/Focus session reward
+    case 'focus_session': {
+      if (metadata && (typeof metadata.plannedDurationMinutes === 'number' || typeof metadata.plannedSec === 'number' || typeof metadata.xpAmount === 'number')) {
+        if (typeof metadata.xpAmount === 'number') {
+          return metadata.xpAmount;
+        }
+        const decision = decideFocusXp(
+          metadata as any,
+          typeof metadata.priorFocusXpToday === 'number' ? metadata.priorFocusXpToday : 0
+        );
+        return decision.xpAmount;
+      }
+      return 50; // Pomodoro/Focus session reward fallback
+    }
     case 'challenge_completed': return typeof metadata?.xpReward === 'number' ? metadata.xpReward : 35;
     case 'milestone': return 0;
     case 'manual': return 0;
